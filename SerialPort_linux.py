@@ -50,21 +50,25 @@ See also uspp module docstring.
 import os
 from termios import *
 import fcntl
-import exceptions
 import struct
 import array
 
+__version__ = "1.1"
+__license__ = "lgpl"
 
-class SerialPortException(exceptions.Exception):
+
+class SerialPortException(Exception):
     """Exception raise in the SerialPort methods"""
     def __init__(self, args=None):
-        self.args=args
+        self.parameter = args
+    def __str__(self):
+        return repr(self.parameter)
 
 
-class SerialPort:
+class SerialPort(object):
     """Encapsulate methods for accesing to a serial port."""
 
-    BaudRatesDic={
+    BaudRatesDic = {
         110: B110,
         300: B300,
         600: B600,
@@ -76,8 +80,13 @@ class SerialPort:
         38400: B38400,
         57600: B57600,
         115200: B115200
+        200000: B200000,
+        250000: B250000,
+        300000: B300000,
+        350000: B350000,
+        400000: B400000
         }
-    buf = array.array('h', '\000'*4)
+    buf = array.array('h', '\000' * 4)
 
     def __init__(self, dev, timeout=None, speed=None, mode='232', params=None):
         """Open the serial port named by the string 'dev'
@@ -113,12 +122,11 @@ class SerialPort:
         initialization.
 
         """
-        self.__devName, self.__timeout, self.__speed=dev, timeout, speed
-        self.__mode=mode
-        self.__params=params
+        self.__dev_name, self.__timeout, self.__speed = dev, timeout, speed
+        self.__mode, self.__params = mode, params
         try:
-	        self.__handle=os.open(dev, os.O_RDWR)
-        except:
+            self.__handle = os.open(self.__dev_name, os.O_RDWR)
+        except pywintypes.error:
             raise SerialPortException('Unable to open port')
 
         self.__configure()
@@ -129,9 +137,9 @@ class SerialPort:
         To close the serial port we have to do explicity: del s
         (where s is an instance of SerialPort)
         """
-	
+
     	tcsetattr(self.__handle, TCSANOW, self.__oldmode)
-	
+
         try:
             os.close(self.__handle)
         except IOError:
@@ -145,16 +153,16 @@ class SerialPort:
         serial port with the characteristics given in the constructor.
         """
         if not self.__speed:
-            self.__speed=9600
+            self.__speed = 9600
         
         # Save the initial port configuration
-        self.__oldmode=tcgetattr(self.__handle)
+        self.__oldmode = tcgetattr(self.__handle)
         if not self.__params:
             # self.__params is a list of attributes of the file descriptor
             # self.__handle as follows:
             # [c_iflag, c_oflag, c_cflag, c_lflag, c_ispeed, c_ospeed, cc]
             # where cc is a list of the tty special characters.
-            self.__params=[]
+            self.__params = []
             # c_iflag
             self.__params.append(IGNPAR)           
             # c_oflag
@@ -167,7 +175,7 @@ class SerialPort:
             self.__params.append(SerialPort.BaudRatesDic[self.__speed]) 
             # c_ospeed
             self.__params.append(SerialPort.BaudRatesDic[self.__speed]) 
-	    cc=[0]*NCCS
+        cc = [0] * NCCS
         if self.__timeout==None:
             # A reading is only complete when VMIN characters have
             # been received (blocking reading)
@@ -177,13 +185,13 @@ class SerialPort:
             # Non-blocking reading. The reading operation returns
             # inmeditately, returning the characters waiting to 
             # be read.
-            cc[VMIN]=0
-            cc[VTIME]=0
+            cc[VMIN] = 0
+            cc[VTIME] = 0
         else:
             # Time-out reading. For a reading to be correct
             # a character must be recieved in VTIME*100 seconds.
-            cc[VMIN]=0
-            cc[VTIME]=self.__timeout/100
+            cc[VMIN] = 0
+            cc[VTIME] = self.__timeout / 100
         self.__params.append(cc)               # c_cc
         
         tcsetattr(self.__handle, TCSANOW, self.__params)
@@ -198,6 +206,9 @@ class SerialPort:
         return self.__handle
 
 
+    def close(self):
+        self.__del__()
+
     def __read1(self):
         """Read 1 byte from the serial port.
 
@@ -205,7 +216,7 @@ class SerialPort:
         because a timeout has expired.
         """
         byte = os.read(self.__handle, 1)
-        if len(byte)==0 and self.__timeout!=0: # Time-out
+        if len(byte) == 0 and self.__timeout != 0: # Time-out
             raise SerialPortException('Timeout')
         else:
             return byte
@@ -217,11 +228,11 @@ class SerialPort:
         Uses the private method __read1 to read num bytes. If an exception
         is generated in any of the calls to __read1 the exception is reraised.
         """
-        s=''
-        for i in range(num):
-            s=s+SerialPort.__read1(self)
+        inputs = []
+        for _ in range(num):
+            inputs.append(SerialPort.__read1(self))
         
-        return s
+        return "".join(inputs)
 
 
     def readline(self):
@@ -230,38 +241,40 @@ class SerialPort:
         Douglas Jones (dfj23@drexel.edu) 09/09/2005.
         """
 
-        s = ''
-        while not '\n' in s:
-            s = s+SerialPort.__read1(self)
+        inputs = []
+        while True:
+            line = SerialPort.__read1(self)
+            if line != "\n":
+                inputs.append(line)
+            else:
+                break
 
-        return s 
+        return "".join(inputs)
 
         
-    def write(self, s):
+    def write(self, text):
         """Write the string s to the serial port"""
+        os.write(self.__handle, text)
 
-        os.write(self.__handle, s)
-
-        
     def inWaiting(self):
         """Returns the number of bytes waiting to be read"""
-    	data = struct.pack("L", 0)
-        data=fcntl.ioctl(self.__handle, TIOCINQ, data)
-    	return struct.unpack("L", data)[0]
+        data = struct.pack("L", 0)
+        data = fcntl.ioctl(self.__handle, TIOCINQ, data)
+        return struct.unpack("L", data)[0]
 
     def outWaiting(self):
         """Returns the number of bytes waiting to be write
         mod. by J.Grauheding
         result needs some finetunning
         """
-        rbuf=fcntl.ioctl(self.__handle, TIOCOUTQ, self.buf)
+        rbuf = fcntl.ioctl(self.__handle, TIOCOUTQ, self.buf)
         return rbuf
 
     def getlsr(self):
         """Returns the status of the UART LSR Register
         J.Grauheding
         """
-        rbuf=fcntl.ioctl(self.__handle, TIOCSERGETLSR, self.buf)
+        rbuf = fcntl.ioctl(self.__handle, TIOCSERGETLSR, self.buf)
         return ord(rbuf[0])
 
     def get_temt(self):
@@ -269,7 +282,7 @@ class SerialPort:
         J.Grauheding
         test result against TIOCSER_TEMT
         """
-        rbuf=fcntl.ioctl(self.__handle, TIOCSERGETLSR, self.buf)
+        rbuf = fcntl.ioctl(self.__handle, TIOCSERGETLSR, self.buf)
         return ord(rbuf[0]) & TIOSER_TEMT
 
 
@@ -277,32 +290,24 @@ class SerialPort:
         """Discards all bytes from the output or input buffer"""
         tcflush(self.__handle, TCIOFLUSH)
 
-    def rts_on(self):
-        """ J.Grauheding """
-        rbuf = fcntl.ioctl(self.__handle, TIOCMGET, SerialPort.buf)
-        SerialPort.buf[1] = ord(rbuf[3]) | TIOCM_RTS
-        rbuf = fcntl.ioctl(self.__handle, TIOCMSET, SerialPort.buf)
-        return rbuf
-
-    def rts_off(self):
+    def set_rts(self, level=True):
         """ J.Grauheding """
         rbuf = fcntl.ioctl(self.__handle, TIOCMGET, self.buf)
-        self.buf[1]=ord(rbuf[3]) & ~TIOCM_RTS
+        if level:
+            SerialPort.buf[1] = ord(rbuf[3]) | TIOCM_RTS
+        else:
+            self.buf[1]=ord(rbuf[3]) & ~TIOCM_RTS
         rbuf = fcntl.ioctl(self.__handle, TIOCMSET, self.buf)
         return rbuf
 
-    def dtr_on(self):
+    def set_dtr(self, level=True):
         """ J.Grauheding """
         rbuf = fcntl.ioctl(self.__handle, TIOCMGET, SerialPort.buf)
-        SerialPort.buf[1] = ord(rbuf[3]) | TIOCM_DTR
+        if level:
+            SerialPort.buf[1] = ord(rbuf[3]) | TIOCM_DTR
+        else:
+            self.buf[1]=ord(rbuf[3]) & ~TIOCM_DTR
         rbuf = fcntl.ioctl(self.__handle, TIOCMSET, SerialPort.buf)
-        return rbuf
-
-    def dtr_off(self):
-        """ J.Grauheding """
-        rbuf = fcntl.ioctl(self.__handle, TIOCMGET, self.buf)
-        self.buf[1]=ord(rbuf[3]) & ~TIOCM_DTR
-        rbuf = fcntl.ioctl(self.__handle, TIOCMSET, self.buf)
         return rbuf
 
     def cts(self):

@@ -1,3 +1,5 @@
+# -*- coding: iso-8859-1 -*-
+
 ##########################################################################
 # USPP Library (Universal Serial Port Python Library)
 #
@@ -49,19 +51,23 @@ import tty
 import termios 
 import array
 import fcntl
-import exceptions
 import string
 
-class SerialPortException(exceptions.Exception):
+__version__ = "1.1"
+__license__ = "lgpl"
+
+class SerialPortException(Exception):
     """Exception raise in the SerialPort methods"""
     def __init__(self, args=None):
-        self.args=args
+        self.parameter = args
+    def __str__(self):
+        return repr(self.parameter)
 
 
 class SerialPort:
     """Encapsulate methods for accesing to a serial port."""
 
-    BaudRatesDic={
+    BaudRatesDic = {
         50: termios.B50,
         75: termios.B75,
         110: termios.B110,
@@ -81,7 +87,7 @@ class SerialPort:
         115200: termios.B115200,
         230400: termios.B230400
         }
-    buf = array.array('h', '\000'*4)
+    buf = array.array('h', '\000' * 4)
 
     def __init__(self, dev, timeout=None, speed=None, mode='232', params=None):
         """Open the serial port named by the string 'dev'
@@ -117,12 +123,11 @@ class SerialPort:
         initialization.
 
         """
-        self.__devName, self.__timeout, self.__speed=dev, timeout, speed
-        self.__mode=mode
-        self.__params=params
+        self.__dev_name, self.__timeout, self.__speed = dev, timeout, speed
+        self.__mode, self.__params = mode, params
         try:
-	    self.__handle=os.open(dev, os.O_RDWR)
-        except:
+            self.__handle = os.open(self.__dev_name, os.O_RDWR)
+        except IOError:
             raise SerialPortException('Unable to open port')
 
         self.__configure()
@@ -133,9 +138,9 @@ class SerialPort:
         To close the serial port we have to do explicity: del s
         (where s is an instance of SerialPort)
         """
-	
-    	termios.tcsetattr(self.__handle, termios.TCSANOW, self.__oldmode)
-	
+
+        termios.tcsetattr(self.__handle, termios.TCSANOW, self.__oldmode)
+
         try:
             os.close(self.__handle)
         except IOError:
@@ -149,7 +154,7 @@ class SerialPort:
         serial port with the characteristics given in the constructor.
         """
         if not self.__speed:
-            self.__speed=9600
+            self.__speed = 9600
         
         # Save the initial port configuration
         self.__oldmode=termios.tcgetattr(self.__handle)
@@ -175,23 +180,23 @@ class SerialPort:
             # cc=[0]*termios.NCCS 
             # but it doesn't work because NCCS is 19 and self.__oldmode[6]
             # is 32 ¿¿¿¿¿¿¿¿¿¿¿ Any help ??????????????
-            cc=[0]*len(self.__oldmode[6])
-            if self.__timeout==None:
+            cc = [0] * len(self.__oldmode[6])
+            if self.__timeout == None:
                 # A reading is only complete when VMIN characters have
                 # been received (blocking reading)
-                cc[termios.VMIN]=1
-                cc[termios.VTIME]=0
+                cc[termios.VMIN] = 1
+                cc[termios.VTIME] = 0
             elif self.__timeout==0:
                 # Non-blocking reading. The reading operation returns
                 # inmeditately, returning the characters waiting to 
                 # be read.
-                cc[termios.VMIN]=0
-                cc[termios.VTIME]=0
+                cc[termios.VMIN] = 0
+                cc[termios.VTIME] = 0
             else:
                 # Time-out reading. For a reading to be correct
                 # a character must be recieved in VTIME*100 seconds.
-                cc[termios.VMIN]=0
-                cc[termios.VTIME]=self.__timeout/100
+                cc[termios.VMIN] = 0
+                cc[termios.VTIME] = self.__timeout / 100
             self.__params.append(cc)               # c_cc
         
         termios.tcsetattr(self.__handle, termios.TCSANOW, self.__params)
@@ -207,10 +212,10 @@ class SerialPort:
 
 
     def setraw(self):
-	tty.setraw(self.__handle)
+        tty.setraw(self.__handle)
 
     def setcbreak(self):
-	tty.setcbreak(self.__handle)
+        tty.setcbreak(self.__handle)
 
     def __read1(self):
         """Read 1 byte from the serial port.
@@ -219,7 +224,7 @@ class SerialPort:
         because a timeout has expired.
         """
         byte = os.read(self.__handle, 1)
-        if len(byte)==0 and self.__timeout!=0: # Time-out
+        if len(byte) == 0 and self.__timeout != 0: # Time-out
             raise SerialPortException('Timeout')
         else:
             return byte
@@ -231,11 +236,11 @@ class SerialPort:
         Uses the private method __read1 to read num bytes. If an exception
         is generated in any of the calls to __read1 the exception is reraised.
         """
-        s=''
-        for i in range(num):
-            s=s+SerialPort.__read1(self)
+        lines = []
+        for _ in range(num):
+            lines.append(SerialPort.__read1(self))
         
-        return s
+        return "".join(lines)
             
 
     def readline(self):
@@ -244,11 +249,15 @@ class SerialPort:
         Douglas Jones (dfj23@drexel.edu) 09/09/2005.
         """
 
-        s = ''
-        while not '\n' in s:
-            s = s+SerialPort.__read1(self)
+        lines = []
+        while True:
+            line = SerialPort.__read1(self)
+            if line != "\n":
+                lines.append(line)
+            else:
+                break
 
-        return s 
+        return "".join(lines)
 
 
     def write(self, s):
@@ -260,46 +269,37 @@ class SerialPort:
         """Returns the number of bytes waiting to be read 
            mod. by J.Grauheding
         """
-        rbuf=fcntl.ioctl(self.__handle, termios.TIOCINQ, self.buf)
+        rbuf = fcntl.ioctl(self.__handle, termios.TIOCINQ, self.buf)
         return rbuf
 
     def outWaiting(self):
         """Returns the number of bytes waiting to be write
            mod. by J.Grauheding
         """
-        rbuf=fcntl.ioctl(self.__handle, termios.TIOCOUTQ, self.buf)
+        rbuf = fcntl.ioctl(self.__handle, termios.TIOCOUTQ, self.buf)
         return rbuf
 
-        
     def flush(self):
         """Discards all bytes from the output or input buffer"""
         termios.tcflush(self.__handle, termios.TCIOFLUSH)
 
-    def rts_on(self):
-	""" J.Grauheding """
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, SerialPort.buf)
-        SerialPort.buf[1] = ord(rbuf[3]) | termios.TIOCM_RTS
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, SerialPort.buf)
-        return rbuf
-
-    def rts_off(self):
+    def set_rts(self, level=True):
         """ J.Grauheding """
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)
-        self.buf[1]=ord(rbuf[3]) & ~termios.TIOCM_RTS
+        if level:
+            SerialPort.buf[1] = ord(rbuf[3]) | termios.TIOCM_RTS
+        else:
+            self.buf[1]=ord(rbuf[3]) & ~termios.TIOCM_RTS
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
         return rbuf
 
-    def dtr_on(self):
-	""" J.Grauheding """
-	rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, SerialPort.buf)
-	SerialPort.buf[1] = ord(rbuf[3]) | termios.TIOCM_DTR
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, SerialPort.buf)
-	return rbuf
-
-    def dtr_off(self):
-	""" J.Grauheding """
+    def set_dtr(self, level=True):
+        """ J.Grauheding """
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)       
-        self.buf[1]=ord(rbuf[3]) & ~termios.TIOCM_DTR
+        if level:
+            SerialPort.buf[1] = ord(rbuf[3]) | termios.TIOCM_DTR
+        else:
+            self.buf[1] = ord(rbuf[3]) & ~termios.TIOCM_DTR
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
         return rbuf
   

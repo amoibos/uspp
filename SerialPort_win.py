@@ -54,18 +54,22 @@ See also uspp module docstring.
 from win32file import *
 from win32event import *
 import win32con
-import exceptions
 
-class SerialPortException(exceptions.Exception):
+__version__ = "1.1"
+__license__ = "lgpl"
+
+class SerialPortException(Exception):
     """Exception raise in the SerialPort methods"""
     def __init__(self, args=None):
-        self.args=args
+        self.parameter = args
+    def __str__(self):
+        return repr(self.parameter)
 
 
-class SerialPort:
+class SerialPort(object):
     """Encapsulate methods for accesing to a serial port."""
 
-    BaudRatesDic={110: CBR_110,
+    BaudRatesDic = {110: CBR_110,
                   300: CBR_300,
                   600: CBR_600,
                   1200: CBR_1200,
@@ -76,6 +80,8 @@ class SerialPort:
                   38400: CBR_38400,
                   57600: CBR_57600,
                   115200: CBR_115200,
+                  128000: CBR_128000,
+                  256000: CBR_256000
                   }
 
     def __init__(self, dev, timeout=None, speed=None, mode='232', params=None):
@@ -103,29 +109,27 @@ class SerialPort:
         Default to RS232 mode (at moment, only the RS-232 mode is
         implemented).
 
-        'params' is a list that specifies properties of the serial 
+        'params' is a dictionary that specifies properties of the serial 
         communication.
-        If params=None it uses default values for the number of bits
-        per byte (8), the parity (NOPARITY) and the number of stop bits (1)
-        else params must be a list with three items setting up the 
-        these values in this order.
+        If params=None it uses default values otherwise uses the dictionary
+        where identifies must have the same names as in PyDCB.
 
         """
 
-        dev = "\\\\.\\" + dev # to allow to digits ports 
-        self.__devName, self.__timeout, self.__speed=dev, timeout, speed
-        self.__mode=mode
-        self.__params=params
+        self.__dev_name = "\\\\.\\%s" % dev # to allow to digits ports 
+        self.__timeout, self.__speed = timeout, speed
+        self.__mode, self.__params = mode, params
         try:
-            self.__handle=CreateFile (dev,
+            self.__handle = CreateFile(self.__dev_name,
                                   win32con.GENERIC_READ|win32con.GENERIC_WRITE,
                                   0, # exclusive access
                                   None, # no security
                                   win32con.OPEN_EXISTING,
                                   win32con.FILE_ATTRIBUTE_NORMAL,
                                   None)
-        except:
+        except pywintypes.error:
             raise SerialPortException('Unable to open port')
+            exit(-1)
 
         self.__configure()
 
@@ -139,7 +143,7 @@ class SerialPort:
             CloseHandle(self.__handle)
         except IOError:
             raise SerialPortException('Unable to close port')
-
+            exit(-1)
 
     def __configure(self):
         """Configure the serial port.
@@ -148,7 +152,7 @@ class SerialPort:
         serial port with the characteristics given in the constructor.
         """
         if not self.__speed:
-            self.__speed=9600
+            self.__speed = 9600
         # Tell the port we want a notification on each char
         SetCommMask(self.__handle, EV_RXCHAR)
         # Setup a 4k buffer
@@ -165,25 +169,30 @@ class SerialPort:
         # [3] int : WriteTotalTimeoutMultiplier
         # [4] int : WriteTotalTimeoutConstant
 
-        if self.__timeout==None:
-            timeouts= 0, 0, 0, 0, 0
-        elif self.__timeout==0:
+        if self.__timeout == None:
+            timeouts = 0, 0, 0, 0, 0
+        elif self.__timeout == 0:
             timeouts = win32con.MAXDWORD, 0, 0, 0, 1000
         else:
-            timeouts= self.__timeout, 0, self.__timeout, 0 , 1000
+            timeouts = self.__timeout, 0, self.__timeout, 0, 1000
         SetCommTimeouts(self.__handle, timeouts)
 
         # Setup the connection info
-        dcb=GetCommState(self.__handle)
-        dcb.BaudRate=SerialPort.BaudRatesDic[self.__speed]
+        dcb = GetCommState(self.__handle)
+        dcb.BaudRate = SerialPort.BaudRatesDic[self.__speed]
         if not self.__params:
-            dcb.ByteSize=8
-            dcb.Parity=NOPARITY
-            dcb.StopBits=ONESTOPBIT
+            dcb.ByteSize = 8
+            dcb.Parity = NOPARITY
+            dcb.StopBits = ONESTOPBIT
         else:
-            dcb.ByteSize, dcb.Parity, dcb.StopBits=self.__params
+            for name in self.__params:
+                setattr(dcb, name, self.__params[name])
+            #dcb.ByteSize, dcb.Parity, dcb.StopBits = self.__params
         SetCommState(self.__handle, dcb)
         
+
+    def close(self):
+        self.__del__()
 
     def fileno(self):
         """Return the file descriptor for opened device.
@@ -203,8 +212,9 @@ class SerialPort:
         up to num bytes that have previously been received.
         """
 
-        (hr, buff) = ReadFile(self.__handle, num)
-        if len(buff)<>num and self.__timeout!=0: # Time-out  
+        hr, buff = ReadFile(self.__handle, num)
+        print(self.__timeout, buff)
+        if len(buff) != num and self.__timeout != 0: # Time-out  
             raise SerialPortException('Timeout')
         else:
             return buff
@@ -216,17 +226,33 @@ class SerialPort:
         
         """
 
-        s = ''
-        while not '\n' in s:
-            s = s+SerialPort.read(self,1)
+        lines = []
+        while True:
+            line = SerialPort.read(self, 1)
+            if line != "\n":
+                lines.append(line)
+            else:
+                break
+      
+        return "".join(lines)
 
-        return s 
 
+    def set_dtr(self, level=True):
+        """"""
+        PurgeComm(self.__handle, SETDTR if level else CLRDTR)
+        
+    def set_rts(self, level=True):
+        """"""
+        PurgeComm(self.__handle, SETRTS if level else CLRRTS)
+
+    def set_break(self, level=True):
+        """"""
+        PurgeComm(self.__handle, SETBREAK if level else CLRBREAK)
 
     def write(self, s):
         """Write the string s to the serial port"""
-        overlapped=OVERLAPPED()
-        overlapped.hEvent=CreateEvent(None, 0,0, None)
+        overlapped = OVERLAPPED()
+        overlapped.hEvent=CreateEvent(None, 0, 0, None)
         WriteFile(self.__handle, s, overlapped)
         # Wait for the write to complete
         WaitForSingleObject(overlapped.hEvent, INFINITE)
@@ -236,12 +262,16 @@ class SerialPort:
         flags, comstat = ClearCommError(self.__handle)
         return comstat.cbInQue
 
+    def flushInput(self):
+        """Discards all bytes from the intput buffer"""
+        PurgeComm(self.__handle, PURGE_RXABORT|PURGE_RXCLEAR)
+        
+    def flushOutput(self):
+        """Discards all bytes from the output buffer"""
+        PurgeComm(self.__handle, PURGE_TXABORT|PURGE_TXCLEAR)
+
     def flush(self):
         """Discards all bytes from the output or input buffer"""
-        PurgeComm(self.__handle, PURGE_TXABORT|PURGE_RXABORT|PURGE_TXCLEAR|
-                  PURGE_RXCLEAR)
-
-
-
-        
+        self.flushInput()
+        self.flushOutput()
 

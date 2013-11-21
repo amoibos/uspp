@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
 
 # -*- coding: iso-8859-1 -*-
 
@@ -180,14 +180,16 @@ as published by the Free Software Foundation; version 2 dated
 June, 1991.
 """
 
-__version__="0.1"
-
+__version__ = "1.1"
+__license__ = "lgpl"
 
 import sys
 
-if sys.platform=='win32':
+if sys.platform == 'win32':
     from SerialPort_win import *
-elif sys.platform=='linux2':
+elif sys.platform == 'linux': #check
     from SerialPort_linux import *
+elif sys.platform == 'darwin':
+    from SerialPort_darwin import *
 else:
-    sys.exit('Sorry, no implemented for this platform yet')
+    sys.exit('Sorry, not implemented for this platform yet')
