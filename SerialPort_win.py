@@ -46,7 +46,7 @@ class SerialPortException(Exception):
 class SerialPort(object):
     """Encapsulate methods for accesing to a serial port."""
 
-    supported baud_rates = {
+    supported_baud_rates = {
         110:        win32file.CBR_110,
         300:        win32file.CBR_300,
         600:        win32file.CBR_600,
@@ -114,18 +114,6 @@ class SerialPort(object):
 
         self.__configure()
 
-    def __del__(self):
-        """Close the serial port
-        
-        To close the serial port we have to do explicity: del s
-        (where s is an instance of SerialPort)
-        """
-        try:
-            win32file.CloseHandle(self.__handle)
-        except IOError:
-            raise SerialPortException('Unable to close port')
-            exit(-1)
-
     def __configure(self):
         """Configure the serial port.
 
@@ -160,7 +148,7 @@ class SerialPort(object):
 
         # Setup the connection info
         dcb = win32file.GetCommState(self.__handle)
-        dcb.BaudRate = SerialPort.supported baud_rates[self.__speed]
+        dcb.BaudRate = SerialPort.supported_baud_rates[self.__speed]
         dcb.ByteSize = 8
         dcb.Parity = win32file.NOPARITY
         dcb.StopBits = win32file.ONESTOPBIT
@@ -171,7 +159,17 @@ class SerialPort(object):
         
 
     def close(self):
-        self.__del__()
+        """Close the serial port
+        
+        To close the serial port we have to do explicity: del s
+        (where s is an instance of SerialPort)
+        """
+        try:
+            win32file.CloseHandle(self.__handle)
+        except IOError:
+            raise SerialPortException('Unable to close port')
+            exit(-1)
+
 
     def read(self, num=1):
         """Read num bytes from the serial port.
@@ -183,7 +181,6 @@ class SerialPort(object):
         """
 
         hr, buf = win32file.ReadFile(self.__handle, num)
-        print(self.__timeout, buff)
         if len(buf) != num and self.__timeout != 0: # Time-out  
             raise SerialPortException('Timeout')
         else:

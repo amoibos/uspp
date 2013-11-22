@@ -111,21 +111,6 @@ class SerialPort(object):
 
         self.__configure()
 
-    def __del__(self):
-        """Close the serial port and restore its initial configuration
-        
-        To close the serial port we have to do explicity: del s
-        (where s is an instance of SerialPort)
-        """
-
-    	termios.tcsetattr(self.__handle, termios.TCSANOW, self.__oldmode)
-
-        try:
-            os.close(self.__handle)
-        except IOErrorIOError:
-            raise SerialPortException('Unable to close port')
-
-
     def __configure(self):
         """Configure the serial port.
 
@@ -177,7 +162,19 @@ class SerialPort(object):
         termios.tcsetattr(self.__handle, TCSANOW, self.__params)
 
     def close(self):
-        self.__del__()
+        """Close the serial port and restore its initial configuration
+        
+        To close the serial port we have to do explicity: del s
+        (where s is an instance of SerialPort)
+        """
+
+    	termios.tcsetattr(self.__handle, termios.TCSANOW, self.__oldmode)
+
+        try:
+            os.close(self.__handle)
+        except IOErrorIOError:
+            raise SerialPortException('Unable to close port')
+
 
     def __read1(self):
         """Read 1 byte from the serial port.
@@ -197,11 +194,11 @@ class SerialPort(object):
         Uses the private method __read1 to read num bytes. If an exception
         is generated in any of the calls to __read1 the exception is reraised.
         """
-        inputs = []
+        chars = []
         for _ in range(num):
-            inputs.append(self.__read1(self))
+            chars.append(self.__read1(self))
         
-        return "".join(inputs)
+        return "".join(chars)
 
     def write(self, text):
         """Write the string s to the serial port"""

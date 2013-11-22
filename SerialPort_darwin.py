@@ -111,22 +111,7 @@ class SerialPort:
         except IOError:
             raise SerialPortException('Unable to open port')
 
-        self.__configure()
-
-    def __del__(self):
-        """Close the serial port and restore its initial configuration
-        
-        To close the serial port we have to do explicity: del s
-        (where s is an instance of SerialPort)
-        """
-
-        termios.tcsetattr(self.__handle, termios.TCSANOW, self.__oldmode)
-
-        try:
-            os.close(self.__handle)
-        except IOError:
-            raise SerialPortException('Unable to close port')
-
+        self.__configure()  
 
     def __configure(self):
         """Configure the serial port.
@@ -182,6 +167,20 @@ class SerialPort:
         
         termios.tcsetattr(self.__handle, termios.TCSANOW, self.__params)
     
+    def close(self):
+        """Close the serial port and restore its initial configuration
+        
+        To close the serial port we have to do explicity: del s
+        (where s is an instance of SerialPort)
+        """
+
+        termios.tcsetattr(self.__handle, termios.TCSANOW, self.__oldmode)
+
+        try:
+            os.close(self.__handle)
+        except IOError:
+            raise SerialPortException('Unable to close port')
+
 
     def fileno(self):
         """Return the file descriptor for opened device.
@@ -216,24 +215,24 @@ class SerialPort:
         Uses the private method __read1 to read num bytes. If an exception
         is generated in any of the calls to __read1 the exception is reraised.
         """
-        lines = []
+        chars = []
         for _ in range(num):
-            lines.append(self.__read1(self))
+            chars.append(self.__read1(self))
         
-        return "".join(lines)
+        return "".join(chars)
             
-    def write(self, s):
+    def write(self, text):
         """Write the string s to the serial port"""
 
-        os.write(self.__handle, s)
+        os.write(self.__handle, text)
 
     def flush_output(self):
         """Discards all bytes from the output buffer"""
-        termios.tcflush(self.__handle, TCOFLUSH)
+        termios.tcflush(self.__handle, termios.TCOFLUSH)
         
     def flush_input(self):
         """Discards all bytes from the input buffer"""
-        termios.tcflush(self.__handle, TCIFLUSH)
+        termios.tcflush(self.__handle, termios.TCIFLUSH)
 
     def flush(self):
         """Discards all bytes from the output or input buffer"""
@@ -246,8 +245,7 @@ class SerialPort:
             self.buf[1] = ord(rbuf[3]) | termios.TIOCM_RTS
         else:
             self.buf[1] = ord(rbuf[3]) & ~termios.TIOCM_RTS
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
-        return rbuf
+        return fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
 
     def set_dtr(self, level=True):
         """Set DTR line to specified logic level"""
@@ -256,6 +254,5 @@ class SerialPort:
             self.buf[1] = ord(rbuf[3]) | termios.TIOCM_DTR
         else:
             self.buf[1] = ord(rbuf[3]) & ~termios.TIOCM_DTR
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
-        return rbuf
+        return fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
   
