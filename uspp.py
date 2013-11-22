@@ -180,16 +180,20 @@ as published by the Free Software Foundation; version 2 dated
 June, 1991.
 """
 
-__version__ = "1.1"
+__version__ = "2.0"
 __license__ = "lgpl"
 
+from platform import uname
 import sys
 
-if sys.platform == 'win32':
-    from SerialPort_win import *
-elif sys.platform == 'linux': #check
-    from SerialPort_linux import *
-elif sys.platform == 'darwin':
-    from SerialPort_darwin import *
+os_name = uname()[0]
+if os_name == 'Windows':
+    from SerialPort_win import SerialPort, SerialPortException
+elif os_name == 'Linux':
+    from SerialPort_linux import SerialPort, SerialPortException
+elif os_name == 'Darwin':
+    from SerialPort_darwin import SerialPort, SerialPortException
+elif os_name in ('OpenBSD', 'FreeBSD', 'NetBSD', 'DragonFly'):
+    from SerialPort_bsd import SerialPort, SerialPortException
 else:
     sys.exit('Sorry, not implemented for this platform yet')

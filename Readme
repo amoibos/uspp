@@ -26,7 +26,7 @@ Contents
 ---------------
 
 USPP Library is a multi-platform Python module to access serial ports. At the
-moment, it only works in Windows, Linux and MacOS but as it is written entirely
+moment, it only works in Windows, Linux, BSD and MacOS but as it is written entirely
 in Python (doesn't wrap any C/C++ library) I hope you can extend it to support
 any other platforms. 
 
@@ -36,9 +36,9 @@ any other platforms.
 
 I like very much to make electronic widgets with microcontrollers, specially
 those that can be connected to the computer to send and receive data.
-Some months ago, I discovered Python and inmediatelly liked it a lot. 
+Some months ago, I discovered Python and immediately liked it a lot.
 I started playing with it and saw that I could use it to make prototypes of
-comunication protocols between computer and microcontrollers really
+communication protocols between computer and microcontrollers really
 fast and easily than using C. At the same time, I was interested in
 working over different platforms.
 I started looking for Python modules to access serial port and I found
@@ -74,7 +74,7 @@ as a tar.gz package or as a winzip file.
 
 This module has the following features:
 
-	- hight level access to serial port under several platforms.
+	- high level access to serial port under several platforms.
 	- autodetects the platform in which it is working and exports
 	  the correct classes for that platform.
 	- object oriented approach.
@@ -93,7 +93,7 @@ This module has the following features:
 You need the following to use the library:
 
 	- Python 2.1 or better
-	- In windows you need the win32 extension modules
+	- In windows you need the win32 extension modules also known as pywin32
 
 
 6. Usage and documentation
@@ -186,5 +186,5 @@ This library has been created by Isaac Barona Martinez <ibarona@gmail.com>.
 0.1 - 09/01/2001 (September 2001)
 0.2 - 05/13/2003
 1.0 - 02/24/2006
-
+2.0 - 22/11/2013
 

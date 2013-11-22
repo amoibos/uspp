@@ -46,7 +46,7 @@ class SerialPortException(Exception):
 
 
 class SerialPort(object):
-    """Encapsulate methods for accesing to a serial port."""
+    """Encapsulate methods for accessing to a serial port."""
 
     supported_baud_rates = {
         110:    termios.B110,
@@ -101,7 +101,7 @@ class SerialPort(object):
         initialization.
 
         """
-        self.__dev_name, self.__timeout = dev, timeout,
+        self.__dev_name, self.__timeout = dev, timeout
         self.__mode, self.__params = mode, params
         self.buf = [0] * 4
         try:
@@ -141,19 +141,19 @@ class SerialPort(object):
             "rts_control": "fRtsControl"
         }
         
-        # Save the initial port configuration
+        #Save the initial port configuration
         self.__oldmode = termios.tcgetattr(self.__handle)
         if not self.__params:
             #self.__params is a list of attributes of the file descriptor
             #self.__handle as follows:
             #[c_iflag, c_oflag, c_cflag, c_lflag, c_ispeed, c_ospeed, cc]
-            #where cc is a list of the tty special characters.
+            # where cc is a list of the tty special characters.
             self.__params = []
             #c_iflag
             self.__params.append(termios.IGNPAR)           
             #c_oflag
             self.__params.append(0)                
-            #c_cflag
+            # c_cflag
             self.__params.append(termios.CS8|termios.CLOCAL|termios.CREAD) 
             #c_lflag
             self.__params.append(0)                
@@ -169,18 +169,18 @@ class SerialPort(object):
             cc[termios.VTIME] = 0
         elif self.__timeout == 0:
             #Non-blocking reading. The reading operation returns
-            #inmeditately, returning the characters waiting to
+            #immediately, returning the characters waiting to
             #be read.
             cc[termios.VMIN] = 0
             cc[termios.VTIME] = 0
         else:
-            # Time-out reading. For a reading to be correct
-            # a character must be recieved in VTIME*100 seconds.
+            #Time-out reading. For a reading to be correct
+            #a character must be received in VTIME * 100 seconds.
             cc[termios.VMIN] = 0
             cc[termios.VTIME] = self.__timeout / 100
         self.__params.append(cc)               # c_cc
         
-        termios.tcsetattr(self.__handle, TCSANOW, self.__params)
+        termios.tcsetattr(self.__handle, termios.TCSANOW, self.__params)
 
     def close(self):
         """Close the serial port and restore its initial configuration
@@ -193,7 +193,7 @@ class SerialPort(object):
 
         try:
             os.close(self.__handle)
-        except IOErrorIOError:
+        except IOError:
             raise SerialPortException('Unable to close port')
 
 

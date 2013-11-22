@@ -45,10 +45,10 @@ class SerialPortException(Exception):
         return repr(self.parameter)
 
 
-class SerialPort:
-    """Encapsulate methods for accesing to a serial port."""
+class SerialPort(object):
+    """Encapsulate methods for accessing to a serial port."""
 
-    supported baud_rates = {
+    supported_baud_rates = {
         50:     termios.B50,
         75:     termios.B75,
         110:    termios.B110,
@@ -69,18 +69,18 @@ class SerialPort:
         230400: termios.B230400
     }
     
-    def __init__(self, dev, timeout=None, speed=None, params=None, mode='232'):
+    def __init__(self, dev, params=None, timeout=1000, mode='232'):
         """Open the serial port named by the string 'dev'
 
         'dev' can be any of the following strings: '/dev/ttyS0', '/dev/ttyS1',
         ..., '/dev/ttySX' or '/dev/cua0', '/dev/cua1', ..., '/dev/cuaX'.
         
         'timeout' specifies the inter-byte timeout or first byte timeout
-        (in miliseconds) for all subsequent reads on SerialPort.
+        (in milliseconds) for all subsequent reads on SerialPort.
         If we specify None time-outs are not used for reading operations
         (blocking reading).
         If 'timeout' is 0 then reading operations are non-blocking. It
-        specifies that the reading operation is to return inmediately
+        specifies that the reading operation is to return immediately
         with the bytes that have already been received, even if
         no bytes have been received.
         
@@ -91,7 +91,7 @@ class SerialPort:
         
         'mode' specifies if we are using RS-232 or RS-485. The RS-485 mode
         is half duplex and use the RTS signal to indicate the
-        direction of the communication (transmit or recive).
+        direction of the communication (transmit or receive).
         Default to RS232 mode (at moment, only the RS-232 mode is
         implemented).
 
@@ -103,13 +103,13 @@ class SerialPort:
         initialization.
 
         """
-        self.__dev_name, self.__timeout, self.__speed = dev, timeout, speed
+        self.__dev_name, self.__timeout = dev, timeout
         self.__mode, self.__params = mode, params
         self._buf = [0] * 4
         try:
             self.__handle = os.open(self.__dev_name, os.O_RDWR)
         except IOError:
-            raise SerialPortException('Unable to open port')
+            raise SerialPortException('Unable to open port % s' % dev)
 
         self.__configure()  
 
@@ -119,8 +119,29 @@ class SerialPort:
         Private method called in the class constructor that configure the 
         serial port with the characteristics given in the constructor.
         """
-        if not self.__speed:
-            self.__speed = 9600
+        defaults = {
+            "BaudRate":     9600,
+            "ByteSize":     8,
+            "Parity":       termios.NOPARITY,
+            "StopBits":     termios.ONESTOPBIT,
+            "fDtrControl":  0,
+            "fRtsControl":  0,
+            "fDtrControl":  termios.DTR_CONTROL_HANDSHAKE,
+            "fRtsControl":  termios.RTS_CONTROL_TOGGLE
+        }
+
+        parameter = {
+            "baud_rate":  "BaudRate",
+            "byte_size":  "ByteSize",
+            "parity":     "Parity",
+            "stop_bits":  "StopBits",
+            "dtr":        "fDtrControl",
+            "rts":        "fRtsControl",
+            "xon_char":   "XonChar",
+            "xoff_char":  "XoffChar",
+            "dtr_control":"fDtrControl",
+            "rts_control": "fRtsControl"
+        }
         
         # Save the initial port configuration
         self.__oldmode = termios.tcgetattr(self.__handle)
@@ -139,9 +160,9 @@ class SerialPort:
             # c_lflag
             self.__params.append(0)                
             # c_ispeed
-            self.__params.append(SerialPort.supported baud_rates[self.__speed]) 
+            self.__params.append(SerialPort.supported_baud_rates[self.__speed])
             # c_ospeed
-            self.__params.append(SerialPort.supported baud_rates[self.__speed]) 
+            self.__params.append(SerialPort.supported_baud_rates[self.__speed])
             # XXX FIX: Theorically, it should be better to put:
             # cc = [0]*termios.NCCS 
             # but it doesn't work because NCCS is 19 and self.__oldmode[6]
@@ -186,7 +207,7 @@ class SerialPort:
         """Return the file descriptor for opened device.
 
         This information can be used for example with the 
-        select funcion.
+        select function.
         """
         return self.__handle
 
