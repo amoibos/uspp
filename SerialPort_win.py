@@ -20,29 +20,6 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ##########################################################################
 
-#-------------------------------------------------------------------------
-# Project:   USPP Library (Universal Serial Port Python Library)
-# Name:      SerialPort_win.py
-# Purpose:   Handle low level access to serial port in windows.
-#
-# Author:    Isaac Barona Martinez <ibarona@gmail.com>
-# Copyright: (c) 2001 by Isaac Barona Martínez
-# Licence:   LGPL
-#
-# Created:   26 June 2001
-# History:
-# 20 January 2002 : Damien Géranton <dgeranton@voila.fr>
-#  Bug fix for Win2000, the file must not be open with
-#  FILE_FLAG_OVERLAPPED
-#
-# 29 March 2006: Version 1.1
-#   * Correct an undefined symbol in readline method: Matt Kraai
-#   <kraai@ftbfs.org>
-#   * COM ports with two digits are allowed: Brian Cain <brian.cain@gmail.com>
-# 
-#
-#-------------------------------------------------------------------------
-
 """
 SerialPort_win.py - Handle low level access to serial port in windows.
 
@@ -51,11 +28,11 @@ See also uspp module docstring.
 """
 
 #required pywin32
-from win32file import *
-from win32event import *
+import win32file
+import win32event
 import win32con
 
-__version__ = "1.1"
+__version__ = "2.0"
 __license__ = "lgpl"
 
 class SerialPortException(Exception):
@@ -69,22 +46,23 @@ class SerialPortException(Exception):
 class SerialPort(object):
     """Encapsulate methods for accesing to a serial port."""
 
-    supported baud_rates = {110: CBR_110,
-                  300: CBR_300,
-                  600: CBR_600,
-                  1200: CBR_1200,
-                  2400: CBR_2400,
-                  4800: CBR_4800, 
-                  9600: CBR_9600,
-                  19200: CBR_19200,
-                  38400: CBR_38400,
-                  57600: CBR_57600,
-                  115200: CBR_115200,
-                  128000: CBR_128000,
-                  256000: CBR_256000
-                  }
+    supported baud_rates = {
+        110:        win32file.CBR_110,
+        300:        win32file.CBR_300,
+        600:        win32file.CBR_600,
+        1200:       win32file.CBR_1200,
+        2400:       win32file.CBR_2400,
+        4800:       win32file.CBR_4800, 
+        9600:       win32file.CBR_9600,
+        19200:      win32file.CBR_19200,
+        38400:      win32file.CBR_38400,
+        57600:      win32file.CBR_57600,
+        115200:     win32file.CBR_115200,
+        128000:     win32file.CBR_128000,
+        256000:     win32file.CBR_256000
+    }
 
-    def __init__(self, dev, timeout=None, speed=None, mode='232', params=None):
+    def __init__(self, dev, timeout=None, speed=None, params=None, mode='232'):
         """Open the serial port named by the string 'dev'
 
         'dev' can be any of the following strings: 'COM1', 'COM2', ... 'COMX'
@@ -111,7 +89,7 @@ class SerialPort(object):
 
         'params' is a dictionary that specifies properties of the serial 
         communication.
-        If params=None it uses default values otherwise uses the dictionary
+        If params = None it uses default values otherwise uses the dictionary
         where identifies must have the same names as in PyDCB.
 
         """
@@ -121,7 +99,7 @@ class SerialPort(object):
         self.__timeout, self.__speed = timeout, speed
         self.__mode, self.__params = mode, params
         try:
-            self.__handle = CreateFile(self.__dev_name,
+            self.__handle = win32file.CreateFile(self.__dev_name,
                                   win32con.GENERIC_READ|win32con.GENERIC_WRITE,
                                   #exclusive access
                                   0, 
@@ -143,7 +121,7 @@ class SerialPort(object):
         (where s is an instance of SerialPort)
         """
         try:
-            CloseHandle(self.__handle)
+            win32file.CloseHandle(self.__handle)
         except IOError:
             raise SerialPortException('Unable to close port')
             exit(-1)
@@ -157,12 +135,12 @@ class SerialPort(object):
         if not self.__speed:
             self.__speed = 9600
         # Tell the port we want a notification on each char
-        SetCommMask(self.__handle, EV_RXCHAR)
+        win32file.SetCommMask(self.__handle, win32file.EV_RXCHAR)
         # Setup a 4k buffer
-        SetupComm(self.__handle, 4096, 4096)
+        win32file.SetupComm(self.__handle, 4096, 4096)
         # Remove anything that was there
-        PurgeComm(self.__handle, PURGE_TXABORT|PURGE_RXABORT|PURGE_TXCLEAR|
-                  PURGE_RXCLEAR)
+        win32file.PurgeComm(self.__handle, win32file.PURGE_TXABORT|win32file.PURGE_RXABORT|
+                            win32file.PURGE_TXCLEAR|win32file.PURGE_RXCLEAR)
 
         # Setup the timeouts parameters for the port
         # timeouts is a tuple with the following items:
@@ -181,98 +159,66 @@ class SerialPort(object):
         SetCommTimeouts(self.__handle, timeouts)
 
         # Setup the connection info
-        dcb = GetCommState(self.__handle)
+        dcb = win32file.GetCommState(self.__handle)
         dcb.BaudRate = SerialPort.supported baud_rates[self.__speed]
         dcb.ByteSize = 8
-        dcb.Parity = NOPARITY
-        dcb.StopBits = ONESTOPBIT
+        dcb.Parity = win32file.NOPARITY
+        dcb.StopBits = win32file.ONESTOPBIT
         if self.__params:
             for name in self.__params:
                 setattr(dcb, name, self.__params[name])
-        SetCommState(self.__handle, dcb)
+        win32file.SetCommState(self.__handle, dcb)
         
 
     def close(self):
         self.__del__()
 
-    def fileno(self):
-        """Return the file descriptor for opened device.
-
-        This information can be used for example with the 
-        select function.
-        """
-        return self.__handle
-
-
     def read(self, num=1):
         """Read num bytes from the serial port.
 
-        If self.__timeout!=0 and != None and the number of read bytes is less
+        If self.__timeout != 0 and != None and the number of read bytes is less
         than num an exception is generated because a timeout has expired.
-        If self.__timeout==0 read is non-blocking and inmediately returns
+        If self.__timeout == 0 read is non-blocking and inmediately returns
         up to num bytes that have previously been received.
         """
 
-        hr, buff = ReadFile(self.__handle, num)
+        hr, buf = win32file.ReadFile(self.__handle, num)
         print(self.__timeout, buff)
-        if len(buff) != num and self.__timeout != 0: # Time-out  
+        if len(buf) != num and self.__timeout != 0: # Time-out  
             raise SerialPortException('Timeout')
         else:
-            return buff
-
-
-    def readline(self):
-        """Read a line from the serial port.  Returns input once a '\n'
-        character is found.
-        
-        """
-
-        lines = []
-        while True:
-            line = self.read(self, 1)
-            if line != "\n":
-                lines.append(line)
-            else:
-                break
-      
-        return "".join(lines)
-
+            return buf
 
     def set_dtr(self, level=True):
-        """"""
-        PurgeComm(self.__handle, SETDTR if level else CLRDTR)
+        """Set DTR line to specified logic level"""
+        win32file.PurgeComm(self.__handle, win32file.SETDTR if level else win32file.CLRDTR)
         
     def set_rts(self, level=True):
-        """"""
-        PurgeComm(self.__handle, SETRTS if level else CLRRTS)
+        """Set RTS line to specified logic level"""
+        win32file.PurgeComm(self.__handle, win32file.SETRTS if level else win32file.CLRRTS)
 
     def set_break(self, level=True):
         """"""
-        PurgeComm(self.__handle, SETBREAK if level else CLRBREAK)
+        win32file.PurgeComm(self.__handle, win32file.SETBREAK if level else win32file.CLRBREAK)
 
-    def write(self, s):
+    def write(self, text):
         """Write the string s to the serial port"""
-        overlapped = OVERLAPPED()
-        overlapped.hEvent=CreateEvent(None, 0, 0, None)
-        WriteFile(self.__handle, s, overlapped)
+        overlapped = win32file.OVERLAPPED()
+        overlapped.hEvent = win32file.CreateEvent(None, 0, 0, None)
+        win32file.WriteFile(self.__handle, text, overlapped)
         # Wait for the write to complete
-        WaitForSingleObject(overlapped.hEvent, INFINITE)
-
-    def inWaiting(self):
-        """Returns the number of bytes waiting to be read"""
-        flags, comstat = ClearCommError(self.__handle)
-        return comstat.cbInQue
+        win32file.WaitForSingleObject(overlapped.hEvent, INFINITE)
 
     def flush_input(self):
         """Discards all bytes from the intput buffer"""
-        PurgeComm(self.__handle, PURGE_RXABORT|PURGE_RXCLEAR)
+        win32file.PurgeComm(self.__handle, win32file.PURGE_RXABORT|win32file.PURGE_RXCLEAR)
         
     def flush_output(self):
         """Discards all bytes from the output buffer"""
-        PurgeComm(self.__handle, PURGE_TXABORT|PURGE_TXCLEAR)
+        win32file.PurgeComm(self.__handle, win32file.PURGE_TXABORT|win32file.PURGE_TXCLEAR)
 
     def flush(self):
         """Discards all bytes from the output or input buffer"""
-        self.flush_input()
-        self.flush_output()
+        win32file.PurgeComm(self.__handle, win32file.PURGE_RXABORT|win32file.PURGE_RXCLEAR|
+                            win32file.PURGE_TXABORT|win32file.PURGE_TXCLEAR)
 

@@ -20,24 +20,6 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ##########################################################################
 
-#-------------------------------------------------------------------------
-# Project:   USPP Library (Universal Serial Port Python Library)
-# Name:      SerialPort_darwin.py
-# Purpose:   Handle low level access to serial port in MacOS.
-#
-# Author:    Isaac Barona Martinez <ibarona@gmail.com>
-# Copyright: (c) 2001 by Isaac Barona Martínez
-# Licence:   LGPL
-#
-# Created:   26 June 2001
-# History:   06.02.2003 Modified and extended by J.Grauheding
-#			<juergen.grauheding@a-city.de>
-#	     adapt it for Python 2.2 on Mac OS X
-# Douglas Jones (dfj23@drexel.edu)
-#   - readline method.
-#
-#-------------------------------------------------------------------------
-
 """
 SerialPort_darwin.py - Handle low level access to serial port in Mac OS X.
 
@@ -49,11 +31,10 @@ See also uspp module docstring.
 import os
 import tty
 import termios 
-import array
 import fcntl
 import string
 
-__version__ = "1.1"
+__version__ = "2.0"
 __license__ = "lgpl"
 
 class SerialPortException(Exception):
@@ -68,27 +49,27 @@ class SerialPort:
     """Encapsulate methods for accesing to a serial port."""
 
     supported baud_rates = {
-        50: termios.B50,
-        75: termios.B75,
-        110: termios.B110,
-        134: termios.B134,
-        150: termios.B150,
-        200: termios.B200,
-        300: termios.B300,
-        600: termios.B600,
-        1200: termios.B1200,
-        1800: termios.B1800,
-        2400: termios.B2400,
-        4800: termios.B4800, 
-        9600: termios.B9600,
-        19200: termios.B19200,
-        38400: termios.B38400,
-        57600: termios.B57600,
+        50:     termios.B50,
+        75:     termios.B75,
+        110:    termios.B110,
+        134:    termios.B134,
+        150:    termios.B150,
+        200:    termios.B200,
+        300:    termios.B300,
+        600:    termios.B600,
+        1200:   termios.B1200,
+        1800:   termios.B1800,
+        2400:   termios.B2400,
+        4800:   termios.B4800, 
+        9600:   termios.B9600,
+        19200:  termios.B19200,
+        38400:  termios.B38400,
+        57600:  termios.B57600,
         115200: termios.B115200,
         230400: termios.B230400
-        }
+    }
     
-    def __init__(self, dev, timeout=None, speed=None, mode='232', params=None):
+    def __init__(self, dev, timeout=None, speed=None, params=None, mode='232'):
         """Open the serial port named by the string 'dev'
 
         'dev' can be any of the following strings: '/dev/ttyS0', '/dev/ttyS1',
@@ -124,7 +105,7 @@ class SerialPort:
         """
         self.__dev_name, self.__timeout, self.__speed = dev, timeout, speed
         self.__mode, self.__params = mode, params
-        self.buf = array.array('h', '\000' * 4)
+        self._buf = [0] * 4
         try:
             self.__handle = os.open(self.__dev_name, os.O_RDWR)
         except IOError:
@@ -157,13 +138,13 @@ class SerialPort:
             self.__speed = 9600
         
         # Save the initial port configuration
-        self.__oldmode=termios.tcgetattr(self.__handle)
+        self.__oldmode = termios.tcgetattr(self.__handle)
         if not self.__params:
             # self.__params is a list of attributes of the file descriptor
             # self.__handle as follows:
             # [c_iflag, c_oflag, c_cflag, c_lflag, c_ispeed, c_ospeed, cc]
             # where cc is a list of the tty special characters.
-            self.__params=[]
+            self.__params = []
             # c_iflag
             self.__params.append(termios.IGNPAR)           
             # c_oflag
@@ -177,7 +158,7 @@ class SerialPort:
             # c_ospeed
             self.__params.append(SerialPort.supported baud_rates[self.__speed]) 
             # XXX FIX: Theorically, it should be better to put:
-            # cc=[0]*termios.NCCS 
+            # cc = [0]*termios.NCCS 
             # but it doesn't work because NCCS is 19 and self.__oldmode[6]
             # is 32 ¿¿¿¿¿¿¿¿¿¿¿ Any help ??????????????
             cc = [0] * len(self.__oldmode[6])
@@ -186,7 +167,7 @@ class SerialPort:
                 # been received (blocking reading)
                 cc[termios.VMIN] = 1
                 cc[termios.VTIME] = 0
-            elif self.__timeout==0:
+            elif self.__timeout == 0:
                 # Non-blocking reading. The reading operation returns
                 # inmeditately, returning the characters waiting to 
                 # be read.
@@ -210,7 +191,6 @@ class SerialPort:
         """
         return self.__handle
 
-
     def setraw(self):
         tty.setraw(self.__handle)
 
@@ -220,7 +200,7 @@ class SerialPort:
     def __read1(self):
         """Read 1 byte from the serial port.
 
-        Generate an exception if no byte is read and self.timeout!=0 
+        Generate an exception if no byte is read and self.timeout != 0 
         because a timeout has expired.
         """
         byte = os.read(self.__handle, 1)
@@ -242,59 +222,35 @@ class SerialPort:
         
         return "".join(lines)
             
-
-    def readline(self):
-        """Read a line from the serial port.  Returns input once a '\n'
-        character is found.
-        Douglas Jones (dfj23@drexel.edu) 09/09/2005.
-        """
-
-        lines = []
-        while True:
-            line = self.__read1(self)
-            if line != "\n":
-                lines.append(line)
-            else:
-                break
-
-        return "".join(lines)
-
-
     def write(self, s):
         """Write the string s to the serial port"""
 
         os.write(self.__handle, s)
 
-    def inWaiting(self):
-        """Returns the number of bytes waiting to be read 
-           mod. by J.Grauheding
-        """
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCINQ, self.buf)
-        return rbuf
-
-    def outWaiting(self):
-        """Returns the number of bytes waiting to be write
-           mod. by J.Grauheding
-        """
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCOUTQ, self.buf)
-        return rbuf
+    def flush_output(self):
+        """Discards all bytes from the output buffer"""
+        termios.tcflush(self.__handle, TCOFLUSH)
+        
+    def flush_input(self):
+        """Discards all bytes from the input buffer"""
+        termios.tcflush(self.__handle, TCIFLUSH)
 
     def flush(self):
         """Discards all bytes from the output or input buffer"""
         termios.tcflush(self.__handle, termios.TCIOFLUSH)
 
     def set_rts(self, level=True):
-        """ J.Grauheding """
+        """Set RTS line to specified logic level"""
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)
         if level:
             self.buf[1] = ord(rbuf[3]) | termios.TIOCM_RTS
         else:
-            self.buf[1]=ord(rbuf[3]) & ~termios.TIOCM_RTS
+            self.buf[1] = ord(rbuf[3]) & ~termios.TIOCM_RTS
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
         return rbuf
 
     def set_dtr(self, level=True):
-        """ J.Grauheding """
+        """Set DTR line to specified logic level"""
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)       
         if level:
             self.buf[1] = ord(rbuf[3]) | termios.TIOCM_DTR
@@ -303,23 +259,3 @@ class SerialPort:
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
         return rbuf
   
-    def cts(self):
-        """ J.Grauheding """
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)
-        return ord(rbuf[3]) & termios.TIOCM_CTS
-
-    def cd(self):
-        """ J.Grauheding """
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)
-        return ord(rbuf[3]) & termios.TIOCM_CAR
-
-    def dsr(self):
-        """ J.Grauheding """
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)
-        return ord(rbuf[2]) & (termios.TIOCM_DSR>>8)
-
-    def ri(self):
-        """ J.Grauheding """
-        rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)
-        return ord(rbuf[3]) & termios.TIOCM_RNG
-
