@@ -68,7 +68,7 @@ class SerialPortException(Exception):
 class SerialPort(object):
     """Encapsulate methods for accesing to a serial port."""
 
-    BaudRatesDic = {
+    supported baud_rates = {
         110: B110,
         300: B300,
         600: B600,
@@ -86,7 +86,6 @@ class SerialPort(object):
         350000: B350000,
         400000: B400000
         }
-    buf = array.array('h', '\000' * 4)
 
     def __init__(self, dev, timeout=None, speed=None, mode='232', params=None):
         """Open the serial port named by the string 'dev'
@@ -124,6 +123,7 @@ class SerialPort(object):
         """
         self.__dev_name, self.__timeout, self.__speed = dev, timeout, speed
         self.__mode, self.__params = mode, params
+        self.buf = array.array('h', '\000' * 4)
         try:
             self.__handle = os.open(self.__dev_name, os.O_RDWR)
         except pywintypes.error:
@@ -172,9 +172,9 @@ class SerialPort(object):
             # c_lflag
             self.__params.append(0)                
             # c_ispeed
-            self.__params.append(SerialPort.BaudRatesDic[self.__speed]) 
+            self.__params.append(SerialPort.supported baud_rates[self.__speed]) 
             # c_ospeed
-            self.__params.append(SerialPort.BaudRatesDic[self.__speed]) 
+            self.__params.append(SerialPort.supported baud_rates[self.__speed]) 
         cc = [0] * NCCS
         if self.__timeout==None:
             # A reading is only complete when VMIN characters have
@@ -230,7 +230,7 @@ class SerialPort(object):
         """
         inputs = []
         for _ in range(num):
-            inputs.append(SerialPort.__read1(self))
+            inputs.append(self.__read1(self))
         
         return "".join(inputs)
 
@@ -243,7 +243,7 @@ class SerialPort(object):
 
         inputs = []
         while True:
-            line = SerialPort.__read1(self)
+            line = self.__read1(self)
             if line != "\n":
                 inputs.append(line)
             else:
@@ -294,20 +294,20 @@ class SerialPort(object):
         """ J.Grauheding """
         rbuf = fcntl.ioctl(self.__handle, TIOCMGET, self.buf)
         if level:
-            SerialPort.buf[1] = ord(rbuf[3]) | TIOCM_RTS
+            self.buf[1] = ord(rbuf[3]) | TIOCM_RTS
         else:
-            self.buf[1]=ord(rbuf[3]) & ~TIOCM_RTS
+            self.buf[1] = ord(rbuf[3]) & ~TIOCM_RTS
         rbuf = fcntl.ioctl(self.__handle, TIOCMSET, self.buf)
         return rbuf
 
     def set_dtr(self, level=True):
         """ J.Grauheding """
-        rbuf = fcntl.ioctl(self.__handle, TIOCMGET, SerialPort.buf)
+        rbuf = fcntl.ioctl(self.__handle, TIOCMGET, self.buf)
         if level:
-            SerialPort.buf[1] = ord(rbuf[3]) | TIOCM_DTR
+            self.buf[1] = ord(rbuf[3]) | TIOCM_DTR
         else:
             self.buf[1]=ord(rbuf[3]) & ~TIOCM_DTR
-        rbuf = fcntl.ioctl(self.__handle, TIOCMSET, SerialPort.buf)
+        rbuf = fcntl.ioctl(self.__handle, TIOCMSET, self.buf)
         return rbuf
 
     def cts(self):
@@ -329,6 +329,3 @@ class SerialPort(object):
         """ J.Grauheding """
         rbuf = fcntl.ioctl(self.__handle, TIOCMGET, self.buf)
         return ord(rbuf[3]) & TIOCM_RNG
-
-        
-

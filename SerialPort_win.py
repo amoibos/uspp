@@ -36,7 +36,7 @@
 #  FILE_FLAG_OVERLAPPED
 #
 # 29 March 2006: Version 1.1
-#   * Correct an undefined simbol in readline method: Matt Kraai
+#   * Correct an undefined symbol in readline method: Matt Kraai
 #   <kraai@ftbfs.org>
 #   * COM ports with two digits are allowed: Brian Cain <brian.cain@gmail.com>
 # 
@@ -50,7 +50,7 @@ See also uspp module docstring.
 
 """
 
-
+#required pywin32
 from win32file import *
 from win32event import *
 import win32con
@@ -69,7 +69,7 @@ class SerialPortException(Exception):
 class SerialPort(object):
     """Encapsulate methods for accesing to a serial port."""
 
-    BaudRatesDic = {110: CBR_110,
+    supported baud_rates = {110: CBR_110,
                   300: CBR_300,
                   600: CBR_600,
                   1200: CBR_1200,
@@ -115,15 +115,18 @@ class SerialPort(object):
         where identifies must have the same names as in PyDCB.
 
         """
-
-        self.__dev_name = "\\\\.\\%s" % dev # to allow to digits ports 
+        
+        #to allow to digits ports 
+        self.__dev_name = "\\\\.\\%s" % dev 
         self.__timeout, self.__speed = timeout, speed
         self.__mode, self.__params = mode, params
         try:
             self.__handle = CreateFile(self.__dev_name,
                                   win32con.GENERIC_READ|win32con.GENERIC_WRITE,
-                                  0, # exclusive access
-                                  None, # no security
+                                  #exclusive access
+                                  0, 
+                                  #no security
+                                  None, 
                                   win32con.OPEN_EXISTING,
                                   win32con.FILE_ATTRIBUTE_NORMAL,
                                   None)
@@ -179,15 +182,13 @@ class SerialPort(object):
 
         # Setup the connection info
         dcb = GetCommState(self.__handle)
-        dcb.BaudRate = SerialPort.BaudRatesDic[self.__speed]
-        if not self.__params:
-            dcb.ByteSize = 8
-            dcb.Parity = NOPARITY
-            dcb.StopBits = ONESTOPBIT
-        else:
+        dcb.BaudRate = SerialPort.supported baud_rates[self.__speed]
+        dcb.ByteSize = 8
+        dcb.Parity = NOPARITY
+        dcb.StopBits = ONESTOPBIT
+        if self.__params:
             for name in self.__params:
                 setattr(dcb, name, self.__params[name])
-            #dcb.ByteSize, dcb.Parity, dcb.StopBits = self.__params
         SetCommState(self.__handle, dcb)
         
 
@@ -228,7 +229,7 @@ class SerialPort(object):
 
         lines = []
         while True:
-            line = SerialPort.read(self, 1)
+            line = self.read(self, 1)
             if line != "\n":
                 lines.append(line)
             else:
@@ -262,16 +263,16 @@ class SerialPort(object):
         flags, comstat = ClearCommError(self.__handle)
         return comstat.cbInQue
 
-    def flushInput(self):
+    def flush_input(self):
         """Discards all bytes from the intput buffer"""
         PurgeComm(self.__handle, PURGE_RXABORT|PURGE_RXCLEAR)
         
-    def flushOutput(self):
+    def flush_output(self):
         """Discards all bytes from the output buffer"""
         PurgeComm(self.__handle, PURGE_TXABORT|PURGE_TXCLEAR)
 
     def flush(self):
         """Discards all bytes from the output or input buffer"""
-        self.flushInput()
-        self.flushOutput()
+        self.flush_input()
+        self.flush_output()
 

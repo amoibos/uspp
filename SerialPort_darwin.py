@@ -67,7 +67,7 @@ class SerialPortException(Exception):
 class SerialPort:
     """Encapsulate methods for accesing to a serial port."""
 
-    BaudRatesDic = {
+    supported baud_rates = {
         50: termios.B50,
         75: termios.B75,
         110: termios.B110,
@@ -87,8 +87,7 @@ class SerialPort:
         115200: termios.B115200,
         230400: termios.B230400
         }
-    buf = array.array('h', '\000' * 4)
-
+    
     def __init__(self, dev, timeout=None, speed=None, mode='232', params=None):
         """Open the serial port named by the string 'dev'
 
@@ -125,6 +124,7 @@ class SerialPort:
         """
         self.__dev_name, self.__timeout, self.__speed = dev, timeout, speed
         self.__mode, self.__params = mode, params
+        self.buf = array.array('h', '\000' * 4)
         try:
             self.__handle = os.open(self.__dev_name, os.O_RDWR)
         except IOError:
@@ -173,9 +173,9 @@ class SerialPort:
             # c_lflag
             self.__params.append(0)                
             # c_ispeed
-            self.__params.append(SerialPort.BaudRatesDic[self.__speed]) 
+            self.__params.append(SerialPort.supported baud_rates[self.__speed]) 
             # c_ospeed
-            self.__params.append(SerialPort.BaudRatesDic[self.__speed]) 
+            self.__params.append(SerialPort.supported baud_rates[self.__speed]) 
             # XXX FIX: Theorically, it should be better to put:
             # cc=[0]*termios.NCCS 
             # but it doesn't work because NCCS is 19 and self.__oldmode[6]
@@ -238,7 +238,7 @@ class SerialPort:
         """
         lines = []
         for _ in range(num):
-            lines.append(SerialPort.__read1(self))
+            lines.append(self.__read1(self))
         
         return "".join(lines)
             
@@ -251,7 +251,7 @@ class SerialPort:
 
         lines = []
         while True:
-            line = SerialPort.__read1(self)
+            line = self.__read1(self)
             if line != "\n":
                 lines.append(line)
             else:
@@ -287,7 +287,7 @@ class SerialPort:
         """ J.Grauheding """
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)
         if level:
-            SerialPort.buf[1] = ord(rbuf[3]) | termios.TIOCM_RTS
+            self.buf[1] = ord(rbuf[3]) | termios.TIOCM_RTS
         else:
             self.buf[1]=ord(rbuf[3]) & ~termios.TIOCM_RTS
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
@@ -297,7 +297,7 @@ class SerialPort:
         """ J.Grauheding """
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)       
         if level:
-            SerialPort.buf[1] = ord(rbuf[3]) | termios.TIOCM_DTR
+            self.buf[1] = ord(rbuf[3]) | termios.TIOCM_DTR
         else:
             self.buf[1] = ord(rbuf[3]) & ~termios.TIOCM_DTR
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMSET, self.buf)
@@ -323,4 +323,3 @@ class SerialPort:
         rbuf = fcntl.ioctl(self.__handle, termios.TIOCMGET, self.buf)
         return ord(rbuf[3]) & termios.TIOCM_RNG
 
- 
