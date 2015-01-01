@@ -188,12 +188,9 @@ import sys
 
 os_name = uname()[0]
 if os_name == 'Windows':
-    from SerialPort_win import SerialPort, SerialPortException
-elif os_name == 'Linux':
-    from SerialPort_linux import SerialPort, SerialPortException
-elif os_name == 'Darwin':
-    from SerialPort_darwin import SerialPort, SerialPortException
-elif os_name in ('OpenBSD', 'FreeBSD', 'NetBSD', 'DragonFly'):
-    from SerialPort_bsd import SerialPort, SerialPortException
+    from SerialPort_windows import SerialPort, SerialPortException
+elif os_name in ('Darwin', 'Linux', 'OpenBSD', 'FreeBSD', 
+                    'NetBSD', 'DragonFly'):
+    from SerialPort_posix import SerialPort, SerialPortException
 else:
     sys.exit('Sorry, not implemented for this platform yet')
